@@ -148,7 +148,7 @@ def predict_image(image, model, signal):
         img = Image.open(os.path.join('uploads', image))
 
         # Predict the image using the model
-        results = model(img, save=True, save_crop=True, project='./runs')
+        results = model(img, save=True, save_crop=True, project='./runs/detect')
 
         # Images with predicted bounding boxes are saved in the runs folder
         # results.save('runs')
