@@ -10,6 +10,7 @@ import string
 import numpy as np
 import random
 import traceback
+from ultralytics import YOLO
 
 def get_random_string(length):
     """
@@ -32,7 +33,8 @@ def load_model():
     Load the model from the local directory
     """
     #model = torch.hub.load('./', 'custom', path='YOLOv5_new.pt', source='local')
-    model = torch.hub.load('./yolov5', 'custom', path='pytorch-models/Week_8.pt', source='local')
+    # model = torch.hub.load('./yolov5', 'custom', path='pytorch-models/Week_8.pt', source='local')
+    model = YOLO("./pytorch-models/YOLOv8_Week8.pt")
     return model
 
 def draw_own_bbox(img,x1,y1,x2,y2,label,color=(36,255,12),text_color=(0,0,0)):
@@ -146,10 +148,10 @@ def predict_image(image, model, signal):
         img = Image.open(os.path.join('uploads', image))
 
         # Predict the image using the model
-        results = model(img)
+        results = model(img, save=True, save_crop=True, project='.')
 
         # Images with predicted bounding boxes are saved in the runs folder
-        results.save('runs')
+        # results.save('runs')
 
         # Convert the results to a pandas dataframe and calculate the height and width of the bounding box and the area of the bounding box
         df_results = results.pandas().xyxy[0]

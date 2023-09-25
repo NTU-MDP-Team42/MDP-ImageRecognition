@@ -23,12 +23,12 @@ def image_predict():
     filename = file.filename
     file.save(os.path.join('uploads', filename))
     # filename format: "<timestamp>_<obstacle_id>_<signal>.jpeg"
-    # constituents = file.filename.split("_")
-    # obstacle_id = constituents[1]
+    constituents = file.filename.split("_")
+    obstacle_id = constituents[1]
 
     ## Week 8 ## 
-    # signal = constituents[2].strip(".jpg")
-    image_id = predict_image(filename, model, 'C')
+    signal = constituents[2].strip(".jpg")
+    image_id = predict_image(filename, model, signal)
 
     ## Week 9 ## 
     # We don't need to pass in the signal anymore
@@ -36,7 +36,7 @@ def image_predict():
 
     # Return the obstacle_id and image_id
     result = {
-        "obstacle_id": 'obstacle_id_here',
+        "obstacle_id": obstacle_id,
         "image_id": image_id
     }
     return jsonify(result)
