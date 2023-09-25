@@ -148,13 +148,13 @@ def predict_image(image, model, signal):
         img = Image.open(os.path.join('uploads', image))
 
         # Predict the image using the model
-        results = model(img, save=True, save_crop=True, project='.')
+        results = model(img, save=True, save_crop=True, project='./runs')
 
         # Images with predicted bounding boxes are saved in the runs folder
         # results.save('runs')
 
         # Convert the results to a pandas dataframe and calculate the height and width of the bounding box and the area of the bounding box
-        df_results = results.pandas().xyxy[0]
+        df_results = results.numpy().xyxy[0]
         df_results['bboxHt'] = df_results['ymax'] - df_results['ymin']
         df_results['bboxWt'] = df_results['xmax'] - df_results['xmin']
         df_results['bboxArea'] = df_results['bboxHt'] * df_results['bboxWt']
