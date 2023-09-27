@@ -28,6 +28,8 @@ def get_random_string(length):
     result_str = ''.join(random.choice(string.ascii_letters) for i in range(length))
     return result_str
 
+SIX_STOP_MODEL = YOLO('./pytorch-models/YOLOv8_SIX_STOP_Week8.pt')
+
 def load_model():
     """
     Load the model from the local directory
@@ -148,8 +150,10 @@ def predict_image(image, model, signal):
         img = Image.open(os.path.join('uploads', image))
 
         # Predict the image using the model
-        results = model(img, save=True, save_crop=True, project='./runs/detect')
-
+        results = model.predict(img, conf=0.6, save=True, project='./runs/detect')
+        if len(results[0].boxes) == 0:
+            results = SIX_STOP_MODEL.predict(img, conf=0.8, save=True, project='./runs/detect')
+            
         # Images with predicted bounding boxes are saved in the runs folder
         # results.save('runs')
 
