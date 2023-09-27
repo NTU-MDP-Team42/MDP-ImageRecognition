@@ -152,7 +152,7 @@ def predict_image(image, model, signal):
         # Predict the image using the model
         results = model.predict(img, conf=0.6, save=True, project='./runs/detect')
         if len(results[0].boxes) == 0:
-            results = SIX_STOP_MODEL.predict(img, conf=0.8, save=True, project='./runs/detect')
+            results = SIX_STOP_MODEL.predict(img, conf=0.6, save=True, project='./runs/detect')
             
         # Images with predicted bounding boxes are saved in the runs folder
         # results.save('runs')
@@ -186,7 +186,8 @@ def predict_image(image, model, signal):
             current_area = pred_list.iloc[0]['bboxArea']
             # For each prediction, check if the confidence is greater than 0.5 and if the area is greater than 80% of the current area or 60% if the prediction is 'One'
             for _, row in pred_list.iterrows():
-                if row['name'] != 'Bullseye' and row['confidence'] > 0.5 and ((current_area * 0.8 <= row['bboxArea']) or (row['name'] == 'One' and current_area * 0.6 <= row['bboxArea'])):
+                # if row['name'] != 'Bullseye' and row['confidence'] > 0.5 and ((current_area * 0.8 <= row['bboxArea']) or (row['name'] == 'One' and current_area * 0.6 <= row['bboxArea'])):
+                if row['name'] != 'Bullseye' and row['confidence'] > 0.5:
                     # Add the prediction to the shortlist
                     pred_shortlist.append(row)
                     # Update the current area to the area of the prediction
