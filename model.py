@@ -11,6 +11,7 @@ import numpy as np
 import random
 import traceback
 from ultralytics import YOLO
+import pandas as pd
 
 def get_random_string(length):
     """
@@ -28,7 +29,7 @@ def get_random_string(length):
     result_str = ''.join(random.choice(string.ascii_letters) for i in range(length))
     return result_str
 
-SIX_STOP_MODEL = YOLO('./pytorch-models/YOLOv8_SIX_STOP_Week8.pt')
+SIX_STOP_MODEL: YOLO = YOLO('./pytorch-models/YOLOv8_SIX_STOP_Week8.pt')
 
 def load_model():
     """
@@ -129,7 +130,7 @@ def draw_own_bbox(img,x1,y1,x2,y2,label,color=(36,255,12),text_color=(0,0,0)):
     cv2.imwrite(f"own_results/annotated_image_{label}_{rand}.jpg", img)
 
 
-def predict_image(image, model, signal):
+def predict_image(image, model: YOLO, signal):
     """
     Predict the image using the model and save the results in the 'runs' folder
     
@@ -150,17 +151,23 @@ def predict_image(image, model, signal):
         img = Image.open(os.path.join('uploads', image))
 
         # Predict the image using the model
-        results = model.predict(img, conf=0.6, save=True, project='./runs/detect')
-        if len(results[0].boxes) == 0:
-            results = SIX_STOP_MODEL.predict(img, conf=0.6, save=True, project='./runs/detect')
+        result = model.predict(img, conf=0.6, save=True, project='./runs/detect')[0]
+        names = model.names
+        if len(result.boxes) == 0:
+            result = SIX_STOP_MODEL.predict(img, conf=0.6, save=True, project='./runs/detect')[0]
+            names = SIX_STOP_MODEL.names
+        boxes_array = result.boxes.numpy()
+        df_results = pd.DataFrame({'cls' : boxes_array.cls, 'confidence' : boxes_array.conf, 'xmin' : boxes_array.xywh[:, 0]\
+                                , 'ymin' : boxes_array.xywh[:, 1], 'bboxWt': boxes_array.xywh[:, 2], 'bboxHt': boxes_array.xywh[:, 3]})
+        df_results['name'] = df_results['cls'].map(names)
             
         # Images with predicted bounding boxes are saved in the runs folder
         # results.save('runs')
 
         # Convert the results to a pandas dataframe and calculate the height and width of the bounding box and the area of the bounding box
-        df_results = results.numpy().xyxy[0]
-        df_results['bboxHt'] = df_results['ymax'] - df_results['ymin']
-        df_results['bboxWt'] = df_results['xmax'] - df_results['xmin']
+        # df_results = result.numpy().xyxy[0]
+        # df_results['bboxHt'] = df_results['ymax'] - df_results['ymin']
+        # df_results['bboxWt'] = df_results['xmax'] - df_results['xmin']
         df_results['bboxArea'] = df_results['bboxHt'] * df_results['bboxWt']
 
         # Label with largest bbox height will be last
@@ -229,8 +236,8 @@ def predict_image(image, model, signal):
                         pred = pred_shortlist[-1]
         
         # Draw the bounding box on the image
-        if not isinstance(pred,str):
-            draw_own_bbox(np.array(img), pred['xmin'], pred['ymin'], pred['xmax'], pred['ymax'], pred['name'])
+        # if not isinstance(pred,str):
+        #     draw_own_bbox(np.array(img), pred['xmin'], pred['ymin'], pred['xmax'], pred['ymax'], pred['name'])
 
         name_to_id = {
             "NA": 'NA',
