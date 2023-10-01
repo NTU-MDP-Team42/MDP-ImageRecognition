@@ -37,7 +37,7 @@ def load_model():
     """
     #model = torch.hub.load('./', 'custom', path='YOLOv5_new.pt', source='local')
     # model = torch.hub.load('./yolov5', 'custom', path='pytorch-models/Week_8.pt', source='local')
-    model = YOLO("./pytorch-models/YOLOv8_Week8.pt")
+    model = YOLO("./pytorch-models/YOLOv8_revised_Week8.pt")
     return model
 
 def draw_own_bbox(img,x1,y1,x2,y2,label,color=(36,255,12),text_color=(0,0,0)):
@@ -151,7 +151,7 @@ def predict_image(image, model: YOLO, signal):
         img = Image.open(os.path.join('uploads', image))
 
         # Predict the image using the model
-        result = model.predict(img, conf=0.6, save=True, project='./runs/detect')[0]
+        result = model.predict(img, save=True, project='./runs/detect')[0]
         names = model.names
         if len(result.boxes) == 0:
             result = SIX_STOP_MODEL.predict(img, conf=0.6, save=True, project='./runs/detect')[0]
