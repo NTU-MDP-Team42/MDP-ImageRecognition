@@ -151,7 +151,7 @@ def predict_image(image, model: YOLO, signal):
         img = Image.open(os.path.join('uploads', image))
 
         # Predict the image using the model
-        result = model.predict(img, save=True, project='./runs/detect')[0]
+        result = model.predict(img, conf=0.5, save=True, project='./runs/detect')[0]
         names = model.names
         if len(result.boxes) == 0:
             result = SIX_STOP_MODEL.predict(img, conf=0.6, save=True, project='./runs/detect')[0]
