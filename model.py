@@ -29,7 +29,7 @@ def get_random_string(length):
     result_str = ''.join(random.choice(string.ascii_letters) for i in range(length))
     return result_str
 
-SIX_STOP_MODEL: YOLO = YOLO('./pytorch-models/YOLOv8_SIX_STOP_Week8.pt')
+# SIX_STOP_MODEL: YOLO = YOLO('./pytorch-models/YOLOv8_SIX_STOP_Week8.pt')
 
 def load_model():
     """
@@ -152,12 +152,13 @@ def predict_image(image, model: YOLO, signal):
         # Predict the image using the model
         result = model.predict(img, conf=0.5, save=True, project='./runs/detect')[0]
         names = model.names
-        if len(result.boxes) == 0:
-            result = SIX_STOP_MODEL.predict(img, conf=0.6, save=True, project='./runs/detect')[0]
-            names = SIX_STOP_MODEL.names
+        # if len(result.boxes) == 0:
+        #     result = SIX_STOP_MODEL.predict(img, conf=0.6, save=True, project='./runs/detect')[0]
+        #     names = SIX_STOP_MODEL.names
         boxes_array = result.boxes.numpy()
-        df_results = pd.DataFrame({'cls' : boxes_array.cls, 'confidence' : boxes_array.conf, 'xmin' : boxes_array.xywh[:, 0]\
-                                , 'ymin' : boxes_array.xywh[:, 1], 'bboxWt': boxes_array.xywh[:, 2], 'bboxHt': boxes_array.xywh[:, 3]})
+        df_results = pd.DataFrame({'cls' : boxes_array.cls, 'confidence' : boxes_array.conf,\
+                                'xmin' : boxes_array.xywh[:, 0], 'ymin' : boxes_array.xywh[:, 1],\
+                                'bboxWt': boxes_array.xywh[:, 2], 'bboxHt': boxes_array.xywh[:, 3]})
         df_results['name'] = df_results['cls'].map(names)
             
         # Images with predicted bounding boxes are saved in the runs folder
@@ -179,60 +180,57 @@ def predict_image(image, model: YOLO, signal):
         # Initialize prediction to NA
         pred = 'NA'
 
-        # Ignore Bullseye unless they are the only image detected and select the last label in the list (the last label will be the one with the largest bbox height)
         if len(pred_list) == 1:
-            if pred_list.iloc[0]['name'] != 'Bullseye':
-                pred = pred_list.iloc[0]
+            pred = pred_list.iloc[0]['name']
 
         # If more than 1 label is detected
         elif len(pred_list) > 1:
-
             # More than 1 Symbol detected, filter by confidence and area
-            pred_shortlist = []
-            current_area = pred_list.iloc[0]['bboxArea']
+            # pred_shortlist = []
+            # current_area = pred_list.iloc[0]['bboxArea']
             # For each prediction, check if the confidence is greater than 0.5 and if the area is greater than 80% of the current area or 60% if the prediction is 'One'
-            for _, row in pred_list.iterrows():
-                # if row['name'] != 'Bullseye' and row['confidence'] > 0.5 and ((current_area * 0.8 <= row['bboxArea']) or (row['name'] == 'One' and current_area * 0.6 <= row['bboxArea'])):
-                if row['name'] != 'Bullseye' and row['confidence'] > 0.5:
-                    # Add the prediction to the shortlist
-                    pred_shortlist.append(row)
-                    # Update the current area to the area of the prediction
-                    current_area = row['bboxArea']
+            # for _, row in pred_list.iterrows():
+            #     # if row['name'] != 'Bullseye' and row['confidence'] > 0.5 and ((current_area * 0.8 <= row['bboxArea']) or (row['name'] == 'One' and current_area * 0.6 <= row['bboxArea'])):
+            #     if row['name'] != 'Bullseye':
+            #         # Add the prediction to the shortlist
+            #         pred_shortlist.append(row)
+            #         # Update the current area to the area of the prediction
+            #         current_area = row['bboxArea']
             
-            # If only 1 prediction remains after filtering by confidence and area
-            if len(pred_shortlist) == 1:
-                # Choose that prediction
-                pred = pred_shortlist[0]
+            # # If only 1 prediction remains after filtering by confidence and area
+            # if len(pred_shortlist) == 1:
+            #     # Choose that prediction
+            #     pred = pred_shortlist[0]
 
-            # If multiple predictions remain after filtering by confidence and area
-            else:
+            # # If multiple predictions remain after filtering by confidence and area
+            # else:
                 # Use signal of {signal} to filter further 
                 
                 # Sort the predictions by xmin
-                pred_shortlist.sort(key=lambda x: x['xmin'])
+            pred_list.sort_values(by='xmin', inplace=True)
 
-                # If signal is 'L', choose the first prediction in the list, i.e. leftmost in the image
-                if signal == 'L':
-                    pred = pred_shortlist[0]
+            # If signal is 'L', choose the first prediction in the list, i.e. leftmost in the image
+            if signal == 'L':
+                pred = pred_list.iloc[0]['name']
+            
+            # If signal is 'R', choose the last prediction in the list, i.e. rightmost in the image
+            elif signal == 'R':
+                pred = pred_list.iloc[-1]['name']
+            
+            # If signal is 'C', choose the prediction that is central in the image
+            else:
+                # Loop through the predictions shortlist
+                # for i in range(len(pred_shortlist)):
+                #     # If the xmin of the prediction is between 250 and 774, i.e. the center of the image, choose that prediction
+                #     if pred_shortlist[i]['xmin'] > 250 and pred_shortlist[i]['xmin'] < 774:
+                #         pred = pred_shortlist[i]
+                #         break
                 
-                # If signal is 'R', choose the last prediction in the list, i.e. rightmost in the image
-                elif signal == 'R':
-                    pred = pred_shortlist[-1]
-                
-                # If signal is 'C', choose the prediction that is central in the image
-                else:
-                    # Loop through the predictions shortlist
-                    # for i in range(len(pred_shortlist)):
-                    #     # If the xmin of the prediction is between 250 and 774, i.e. the center of the image, choose that prediction
-                    #     if pred_shortlist[i]['xmin'] > 250 and pred_shortlist[i]['xmin'] < 774:
-                    #         pred = pred_shortlist[i]
-                    #         break
-                    
-                    # If no prediction is central, choose the one with the largest area
-                    if isinstance(pred,str):
-                        # Choosing one with largest area if none are central
-                        pred_shortlist.sort(key=lambda x: x['bboxArea']) 
-                        pred = pred_shortlist[-1]
+                # If no prediction is central, choose the one with the largest area
+                if isinstance(pred,str):
+                    # Choosing one with largest area if none are central
+                    pred_list.sort_values(by='bboxArea', inplace=True) 
+                    pred = pred_list.iloc[-1]['name']
         
         # Draw the bounding box on the image
         # if not isinstance(pred,str):
@@ -277,10 +275,11 @@ def predict_image(image, model: YOLO, signal):
             "Stop": 40
         }
         # If pred is not a string, i.e. a prediction was made and pred is not 'NA'
-        if not isinstance(pred,str):
-            image_id = str(name_to_id[pred['name']])
-        else:
-            image_id = 'NA'
+        # if not isinstance(pred,str):
+        #     image_id = str(name_to_id[pred['name']])
+        # else:
+        #     image_id = 'NA'
+        image_id = name_to_id.get(pred, 'NA')
         print(f"Final result: {image_id}")
         return image_id
     # If some error happened, we just return 'NA' so that the inference loop is closed
