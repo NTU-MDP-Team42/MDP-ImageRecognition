@@ -116,15 +116,15 @@ def draw_own_bbox(img,x1,y1,x2,y2,label,color=(36,255,12),text_color=(0,0,0)):
 
     # Save the raw image
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    cv2.imwrite(f"own_results/raw_image_{label}_{rand}.jpg", img)
+    # cv2.imwrite(f"own_results/raw_image_{label}_{rand}.jpg", img)
 
     # Draw the bounding box
-    img = cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
+    img = cv2.rectangle(img, (x1, y1), (x2, y2), color, 4)
     # For the text background, find space required by the text so that we can put a background with that amount of width.
-    (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 1)
+    (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 6, 10)
     # Print the text  
-    img = cv2.rectangle(img, (x1, y1 - 20), (x1 + w, y1), color, -1)
-    img = cv2.putText(img, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color, 1)
+    img = cv2.rectangle(img, (x1, y1), (x1 + w, y1 - h - h), color, -1)
+    img = cv2.putText(img, label, (x1, y1 - h // 2), cv2.FONT_HERSHEY_SIMPLEX, 6, text_color, 20)
     # Save the annotated image
     cv2.imwrite(f"own_results/annotated_image_{label}_{rand}.jpg", img)
 
@@ -156,8 +156,10 @@ def predict_image(image, model: YOLO, signal):
         #     result = SIX_STOP_MODEL.predict(img, conf=0.6, save=True, project='./runs/detect')[0]
         #     names = SIX_STOP_MODEL.names
         boxes_array = result.boxes.numpy()
+        boxes_array.xyxy
         df_results = pd.DataFrame({'cls' : boxes_array.cls, 'confidence' : boxes_array.conf,\
-                                'xmin' : boxes_array.xywh[:, 0], 'ymin' : boxes_array.xywh[:, 1],\
+                                'xmin' : boxes_array.xyxy[:, 0], 'ymin' : boxes_array.xyxy[:, 1],\
+                                'xmax' : boxes_array.xyxy[:, 2], 'ymax' : boxes_array.xyxy[:, 3],\
                                 'bboxWt': boxes_array.xywh[:, 2], 'bboxHt': boxes_array.xywh[:, 3]})
         df_results['name'] = df_results['cls'].map(names)
             
@@ -178,10 +180,10 @@ def predict_image(image, model: YOLO, signal):
         pred_list = pred_list[pred_list['name'] != 'Bullseye']
         
         # Initialize prediction to NA
-        pred = 'NA'
+        pred = None
 
         if len(pred_list) == 1:
-            pred = pred_list.iloc[0]['name']
+            pred = pred_list.iloc[0]
 
         # If more than 1 label is detected
         elif len(pred_list) > 1:
@@ -211,11 +213,11 @@ def predict_image(image, model: YOLO, signal):
 
             # If signal is 'L', choose the first prediction in the list, i.e. leftmost in the image
             if signal == 'L':
-                pred = pred_list.iloc[0]['name']
+                pred = pred_list.iloc[0]
             
             # If signal is 'R', choose the last prediction in the list, i.e. rightmost in the image
             elif signal == 'R':
-                pred = pred_list.iloc[-1]['name']
+                pred = pred_list.iloc[-1]
             
             # If signal is 'C', choose the prediction that is central in the image
             else:
@@ -227,15 +229,11 @@ def predict_image(image, model: YOLO, signal):
                 #         break
                 
                 # If no prediction is central, choose the one with the largest area
-                if isinstance(pred,str):
+                # if isinstance(pred,str):
                     # Choosing one with largest area if none are central
-                    pred_list.sort_values(by='bboxArea', inplace=True) 
-                    pred = pred_list.iloc[-1]['name']
+                pred_list.sort_values(by='bboxArea', inplace=True) 
+                pred = pred_list.iloc[-1]
         
-        # Draw the bounding box on the image
-        # if not isinstance(pred,str):
-        #     draw_own_bbox(np.array(img), pred['xmin'], pred['ymin'], pred['xmax'], pred['ymax'], pred['name'])
-
         name_to_id = {
             "NA": 'NA',
             "Bullseye": 10,
@@ -274,12 +272,19 @@ def predict_image(image, model: YOLO, signal):
             "Left Arrow": 39,
             "Stop": 40
         }
+
+        if pred is not None:
+            draw_own_bbox(np.array(img), pred['xmin'], pred['ymin'], pred['xmax'], pred['ymax'], pred['name'])
+            image_id = name_to_id.get(pred['name'], 'NA')
+        else:
+            image_id = 'NA'
+
         # If pred is not a string, i.e. a prediction was made and pred is not 'NA'
         # if not isinstance(pred,str):
         #     image_id = str(name_to_id[pred['name']])
         # else:
         #     image_id = 'NA'
-        image_id = name_to_id.get(pred, 'NA')
+        
         print(f"Final result: {image_id}")
         return image_id
     # If some error happened, we just return 'NA' so that the inference loop is closed
