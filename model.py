@@ -35,7 +35,7 @@ def load_model():
     """
     Load the model from the local directory
     """
-    model = YOLO("./pytorch-models/YOLOv8_revised_Week8_VER2.pt")
+    model = YOLO("./pytorch-models/YOLOv8_revised_Week8_VER3.pt")
     # model = torch.hub.load('./yolov5', 'custom', path="./pytorch-models/Week_9.pt", source='local')
     return model
 
@@ -156,7 +156,6 @@ def predict_image(image, model: YOLO, signal):
         #     result = SIX_STOP_MODEL.predict(img, conf=0.6, save=True, project='./runs/detect')[0]
         #     names = SIX_STOP_MODEL.names
         boxes_array = result.boxes.numpy()
-        boxes_array.xyxy
         df_results = pd.DataFrame({'cls' : boxes_array.cls, 'confidence' : boxes_array.conf,\
                                 'xmin' : boxes_array.xyxy[:, 0], 'ymin' : boxes_array.xyxy[:, 1],\
                                 'xmax' : boxes_array.xyxy[:, 2], 'ymax' : boxes_array.xyxy[:, 3],\
@@ -278,12 +277,6 @@ def predict_image(image, model: YOLO, signal):
             image_id = name_to_id.get(pred['name'], 'NA')
         else:
             image_id = 'NA'
-
-        # If pred is not a string, i.e. a prediction was made and pred is not 'NA'
-        # if not isinstance(pred,str):
-        #     image_id = str(name_to_id[pred['name']])
-        # else:
-        #     image_id = 'NA'
         
         print(f"Final result: {image_id}")
         return image_id
