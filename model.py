@@ -34,7 +34,7 @@ def load_model():
     Load the model from the local directory
     """
     # model = YOLO("./pytorch-models/YOLOv8_Week9.pt")
-    model = torch.hub.load('./yolov5', 'custom', path="./pytorch-models/Week_9.pt", source='local')
+    model = torch.hub.load('./yolov5', 'custom', path="./pytorch-models/Week9_ver1.pt", source='local')
     return model
 
 def draw_own_bbox(img,x1,y1,x2,y2,label,color=(36,255,12),text_color=(0,0,0)):
@@ -250,16 +250,56 @@ def predict_image(image, model: YOLO, signal):
 def predict_image_week_9(image, model):
     # Load the image
     img = Image.open(os.path.join('uploads', image))
+
     # result = model.predict(img, conf=0.5, save=True, project='./runs/detect')[0]
+    # boxes_array = result.boxes.numpy()
     # Run inference
     result = model(img)
-    # Save the results
-    result.save('runs')
-    # Convert the results to a dataframe
     df_results = result.pandas().xyxy[0]
+
+    if len(df_results) == 0 or df_results.iloc[0]['confidence'] < 0.5:
+    # if len(boxes_array) == 0 or boxes_array.conf[0] < 0.6:
+        for i in [3, 6]:
+            width, height = img.size   # Get dimensions
+            new_width = width // i
+            new_height = height // i
+            left = (width - new_width)/2
+            top = (height - new_height)/2
+            right = (width + new_width)/2
+            bottom = (height + new_height)/2
+            # Crop the center of the image
+            img_cropped = img.crop((left, top, right, bottom))
+
+            result = model(img_cropped)
+            df_results = result.pandas().xyxy[0]
+            if len(df_results) > 0 and df_results.iloc[0]['confidence'] >= 0.5:
+                img = img_cropped
+                break
+            # result = model.predict(img_cropped, conf=0.4, save=True, project='./runs/detect')[0]
+            # boxes_array = result.boxes.numpy()
+            # if len(boxes_array) > 0:
+            #     break
+
+        # img = np.asarray(img)
+        # w, h = img.shape[:2]
+        # M = w // 4
+        # N = h // 4
+        # tiles = [img[x:x+M,y:y+N] for x in range(0,w,M) for y in range(0,h,N)]
+
+        # tiles = tiles[4:-4] + tiles[:4] + tiles[-4:]
+
+        # for tile in tiles:
+        #     img = Image.fromarray(tile)
+        #     result = model(img)
+        #     df_results = result.pandas().xyxy[0]
+        #     if len(df_results) > 0 and df_results.iloc[0]['confidence'] >= 0.5:
+        #         break
+    result.save('runs')
+
     # Calculate the height and width of the bounding box and the area of the bounding box
     df_results['bboxHt'] = df_results['ymax'] - df_results['ymin']
     df_results['bboxWt'] = df_results['xmax'] - df_results['xmin']
+
     # names = model.names
     # boxes_array = result.boxes.numpy()
     # df_results = pd.DataFrame({'cls' : boxes_array.cls, 'confidence' : boxes_array.conf,\

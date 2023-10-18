@@ -3,8 +3,6 @@ from typing import Any
 import numpy as np
 import supervision as sv
 
-import models_loading
-
 def _open_image(img_path: str) -> Image.Image:
     return Image.open(img_path)
 
