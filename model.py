@@ -29,14 +29,12 @@ def get_random_string(length):
     result_str = ''.join(random.choice(string.ascii_letters) for i in range(length))
     return result_str
 
-# SIX_STOP_MODEL: YOLO = YOLO('./pytorch-models/YOLOv8_SIX_STOP_Week8.pt')
-
 def load_model():
     """
     Load the model from the local directory
     """
-    model = YOLO("./pytorch-models/YOLOv8_revised_Week8_VER3.pt")
-    # model = torch.hub.load('./yolov5', 'custom', path="./pytorch-models/Week_9.pt", source='local')
+    # model = YOLO("./pytorch-models/YOLOv8_Week9.pt")
+    model = torch.hub.load('./yolov5', 'custom', path="./pytorch-models/Week_9.pt", source='local')
     return model
 
 def draw_own_bbox(img,x1,y1,x2,y2,label,color=(36,255,12),text_color=(0,0,0)):
@@ -120,11 +118,14 @@ def draw_own_bbox(img,x1,y1,x2,y2,label,color=(36,255,12),text_color=(0,0,0)):
 
     # Draw the bounding box
     img = cv2.rectangle(img, (x1, y1), (x2, y2), color, 4)
+    FONT_SCALE = 2
+    FONT_THICKNESS = 5
     # For the text background, find space required by the text so that we can put a background with that amount of width.
-    (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 6, 10)
+    (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE, FONT_THICKNESS)
     # Print the text  
-    img = cv2.rectangle(img, (x1, y1), (x1 + w, y1 - h - h), color, -1)
-    img = cv2.putText(img, label, (x1, y1 - h // 2), cv2.FONT_HERSHEY_SIMPLEX, 6, text_color, 20)
+    img = cv2.rectangle(img, (x1, y1), (x1 + w, y1 - h - h // 4), color, -1)
+    img = cv2.putText(img, label, (x1, y1 - h // 4), cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE,\
+                      text_color, FONT_THICKNESS)
     # Save the annotated image
     cv2.imwrite(f"own_results/annotated_image_{label}_{rand}.jpg", img)
 
@@ -152,23 +153,14 @@ def predict_image(image, model: YOLO, signal):
         # Predict the image using the model
         result = model.predict(img, conf=0.5, save=True, project='./runs/detect')[0]
         names = model.names
-        # if len(result.boxes) == 0:
-        #     result = SIX_STOP_MODEL.predict(img, conf=0.6, save=True, project='./runs/detect')[0]
-        #     names = SIX_STOP_MODEL.names
         boxes_array = result.boxes.numpy()
         df_results = pd.DataFrame({'cls' : boxes_array.cls, 'confidence' : boxes_array.conf,\
                                 'xmin' : boxes_array.xyxy[:, 0], 'ymin' : boxes_array.xyxy[:, 1],\
                                 'xmax' : boxes_array.xyxy[:, 2], 'ymax' : boxes_array.xyxy[:, 3],\
                                 'bboxWt': boxes_array.xywh[:, 2], 'bboxHt': boxes_array.xywh[:, 3]})
         df_results['name'] = df_results['cls'].map(names)
-            
-        # Images with predicted bounding boxes are saved in the runs folder
-        # results.save('runs')
 
         # Convert the results to a pandas dataframe and calculate the height and width of the bounding box and the area of the bounding box
-        # df_results = result.numpy().xyxy[0]
-        # df_results['bboxHt'] = df_results['ymax'] - df_results['ymin']
-        # df_results['bboxWt'] = df_results['xmax'] - df_results['xmin']
         df_results['bboxArea'] = df_results['bboxHt'] * df_results['bboxWt']
 
         # Label with largest bbox height will be last
@@ -186,28 +178,7 @@ def predict_image(image, model: YOLO, signal):
 
         # If more than 1 label is detected
         elif len(pred_list) > 1:
-            # More than 1 Symbol detected, filter by confidence and area
-            # pred_shortlist = []
-            # current_area = pred_list.iloc[0]['bboxArea']
-            # For each prediction, check if the confidence is greater than 0.5 and if the area is greater than 80% of the current area or 60% if the prediction is 'One'
-            # for _, row in pred_list.iterrows():
-            #     # if row['name'] != 'Bullseye' and row['confidence'] > 0.5 and ((current_area * 0.8 <= row['bboxArea']) or (row['name'] == 'One' and current_area * 0.6 <= row['bboxArea'])):
-            #     if row['name'] != 'Bullseye':
-            #         # Add the prediction to the shortlist
-            #         pred_shortlist.append(row)
-            #         # Update the current area to the area of the prediction
-            #         current_area = row['bboxArea']
-            
-            # # If only 1 prediction remains after filtering by confidence and area
-            # if len(pred_shortlist) == 1:
-            #     # Choose that prediction
-            #     pred = pred_shortlist[0]
-
-            # # If multiple predictions remain after filtering by confidence and area
-            # else:
-                # Use signal of {signal} to filter further 
-                
-                # Sort the predictions by xmin
+            # Sort the predictions by xmin
             pred_list.sort_values(by='xmin', inplace=True)
 
             # If signal is 'L', choose the first prediction in the list, i.e. leftmost in the image
@@ -220,16 +191,7 @@ def predict_image(image, model: YOLO, signal):
             
             # If signal is 'C', choose the prediction that is central in the image
             else:
-                # Loop through the predictions shortlist
-                # for i in range(len(pred_shortlist)):
-                #     # If the xmin of the prediction is between 250 and 774, i.e. the center of the image, choose that prediction
-                #     if pred_shortlist[i]['xmin'] > 250 and pred_shortlist[i]['xmin'] < 774:
-                #         pred = pred_shortlist[i]
-                #         break
-                
-                # If no prediction is central, choose the one with the largest area
-                # if isinstance(pred,str):
-                    # Choosing one with largest area if none are central
+                # Choosing one with largest area if none are central
                 pred_list.sort_values(by='bboxArea', inplace=True) 
                 pred = pred_list.iloc[-1]
         
@@ -288,26 +250,34 @@ def predict_image(image, model: YOLO, signal):
 def predict_image_week_9(image, model):
     # Load the image
     img = Image.open(os.path.join('uploads', image))
+    # result = model.predict(img, conf=0.5, save=True, project='./runs/detect')[0]
     # Run inference
-    results = model(img)
+    result = model(img)
     # Save the results
-    results.save('runs')
+    result.save('runs')
     # Convert the results to a dataframe
-    df_results = results.pandas().xyxy[0]
+    df_results = result.pandas().xyxy[0]
     # Calculate the height and width of the bounding box and the area of the bounding box
     df_results['bboxHt'] = df_results['ymax'] - df_results['ymin']
     df_results['bboxWt'] = df_results['xmax'] - df_results['xmin']
-    df_results['bboxArea'] = df_results['bboxHt'] * df_results['bboxWt']
+    # names = model.names
+    # boxes_array = result.boxes.numpy()
+    # df_results = pd.DataFrame({'cls' : boxes_array.cls, 'confidence' : boxes_array.conf,\
+    #                         'xmin' : boxes_array.xyxy[:, 0], 'ymin' : boxes_array.xyxy[:, 1],\
+    #                         'xmax' : boxes_array.xyxy[:, 2], 'ymax' : boxes_array.xyxy[:, 3],\
+    #                         'bboxWt': boxes_array.xywh[:, 2], 'bboxHt': boxes_array.xywh[:, 3]})
+    # df_results['name'] = df_results['cls'].map(names)
 
     # Label with largest bbox height will be last
-    df_results = df_results.sort_values('bboxArea', ascending=False)
+    df_results['bboxArea'] = df_results['bboxHt'] * df_results['bboxWt']
+    df_results.sort_values(by='bboxArea', ascending=False, inplace=True)
     pred_list = df_results 
     pred = 'NA'
     # If prediction list is not empty
     if pred_list.size != 0:
         # Go through the predictions, and choose the first one with confidence > 0.5
         for _, row in pred_list.iterrows():
-            if row['name'] != 'Bullseye' and row['confidence'] > 0.5:
+            if row['name'] != 'Bullseye':
                 pred = row    
                 break
 
