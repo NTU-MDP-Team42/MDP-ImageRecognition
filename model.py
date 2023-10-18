@@ -33,8 +33,8 @@ def load_model():
     """
     Load the model from the local directory
     """
-    # model = YOLO("./pytorch-models/YOLOv8_Week9.pt")
-    model = torch.hub.load('./yolov5', 'custom', path="./pytorch-models/Week9_ver1.pt", source='local')
+    model = YOLO("./pytorch-models/YOLOv8_revised_Week9_VER1.pt")
+    # model = torch.hub.load('./yolov5', 'custom', path="./pytorch-models/Week9_ver1.pt", source='local')
     return model
 
 def draw_own_bbox(img,x1,y1,x2,y2,label,color=(36,255,12),text_color=(0,0,0)):
@@ -251,14 +251,14 @@ def predict_image_week_9(image, model):
     # Load the image
     img = Image.open(os.path.join('uploads', image))
 
-    # result = model.predict(img, conf=0.5, save=True, project='./runs/detect')[0]
-    # boxes_array = result.boxes.numpy()
+    result = model.predict(img, conf=0.5, save=True, project='./runs/detect')[0]
+    boxes_array = result.boxes.numpy()
     # Run inference
-    result = model(img)
-    df_results = result.pandas().xyxy[0]
+    # result = model(img)
+    # df_results = result.pandas().xyxy[0]
 
-    if len(df_results) == 0 or df_results.iloc[0]['confidence'] < 0.5:
-    # if len(boxes_array) == 0 or boxes_array.conf[0] < 0.6:
+    # if len(df_results) == 0 or df_results.iloc[0]['confidence'] < 0.5:
+    if len(boxes_array) == 0:
         for i in [3, 6]:
             width, height = img.size   # Get dimensions
             new_width = width // i
@@ -270,15 +270,16 @@ def predict_image_week_9(image, model):
             # Crop the center of the image
             img_cropped = img.crop((left, top, right, bottom))
 
-            result = model(img_cropped)
-            df_results = result.pandas().xyxy[0]
-            if len(df_results) > 0 and df_results.iloc[0]['confidence'] >= 0.5:
+            # result = model(img_cropped)
+            # df_results = result.pandas().xyxy[0]
+            # if len(df_results) > 0 and df_results.iloc[0]['confidence'] >= 0.5:
+            #     img = img_cropped
+            #     break
+            result = model.predict(img_cropped, conf=0.5, save=True, project='./runs/detect')[0]
+            boxes_array = result.boxes.numpy()
+            if len(boxes_array) > 0:
                 img = img_cropped
                 break
-            # result = model.predict(img_cropped, conf=0.4, save=True, project='./runs/detect')[0]
-            # boxes_array = result.boxes.numpy()
-            # if len(boxes_array) > 0:
-            #     break
 
         # img = np.asarray(img)
         # w, h = img.shape[:2]
@@ -294,19 +295,17 @@ def predict_image_week_9(image, model):
         #     df_results = result.pandas().xyxy[0]
         #     if len(df_results) > 0 and df_results.iloc[0]['confidence'] >= 0.5:
         #         break
-    result.save('runs')
+    # result.save('runs')
+    # df_results['bboxHt'] = df_results['ymax'] - df_results['ymin']
+    # df_results['bboxWt'] = df_results['xmax'] - df_results['xmin']
 
-    # Calculate the height and width of the bounding box and the area of the bounding box
-    df_results['bboxHt'] = df_results['ymax'] - df_results['ymin']
-    df_results['bboxWt'] = df_results['xmax'] - df_results['xmin']
-
-    # names = model.names
-    # boxes_array = result.boxes.numpy()
-    # df_results = pd.DataFrame({'cls' : boxes_array.cls, 'confidence' : boxes_array.conf,\
-    #                         'xmin' : boxes_array.xyxy[:, 0], 'ymin' : boxes_array.xyxy[:, 1],\
-    #                         'xmax' : boxes_array.xyxy[:, 2], 'ymax' : boxes_array.xyxy[:, 3],\
-    #                         'bboxWt': boxes_array.xywh[:, 2], 'bboxHt': boxes_array.xywh[:, 3]})
-    # df_results['name'] = df_results['cls'].map(names)
+    names = model.names
+    boxes_array = result.boxes.numpy()
+    df_results = pd.DataFrame({'cls' : boxes_array.cls, 'confidence' : boxes_array.conf,\
+                            'xmin' : boxes_array.xyxy[:, 0], 'ymin' : boxes_array.xyxy[:, 1],\
+                            'xmax' : boxes_array.xyxy[:, 2], 'ymax' : boxes_array.xyxy[:, 3],\
+                            'bboxWt': boxes_array.xywh[:, 2], 'bboxHt': boxes_array.xywh[:, 3]})
+    df_results['name'] = df_results['cls'].map(names)
 
     # Label with largest bbox height will be last
     df_results['bboxArea'] = df_results['bboxHt'] * df_results['bboxWt']
