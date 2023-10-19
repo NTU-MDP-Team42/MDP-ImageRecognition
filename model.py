@@ -12,6 +12,10 @@ import random
 import traceback
 from ultralytics import YOLO
 import pandas as pd
+from sahi import AutoDetectionModel, ObjectPrediction
+from sahi.predict import get_prediction, get_sliced_prediction, predict
+from sahi.utils.cv import read_image
+from datetime import datetime
 
 def get_random_string(length):
     """
@@ -246,84 +250,71 @@ def predict_image(image, model: YOLO, signal):
     except Exception as e:
         traceback.print_exc()
         return 'NA'
-
-def predict_image_week_9(image, model):
-    # Load the image
-    img = Image.open(os.path.join('uploads', image))
-
-    result = model.predict(img, conf=0.5, save=True, project='./runs/detect')[0]
-    boxes_array = result.boxes.numpy()
-    # Run inference
-    # result = model(img)
-    # df_results = result.pandas().xyxy[0]
-
-    # if len(df_results) == 0 or df_results.iloc[0]['confidence'] < 0.5:
-    if len(boxes_array) == 0:
-        for i in [3, 6]:
-            width, height = img.size   # Get dimensions
-            new_width = width // i
-            new_height = height // i
-            left = (width - new_width)/2
-            top = (height - new_height)/2
-            right = (width + new_width)/2
-            bottom = (height + new_height)/2
-            # Crop the center of the image
-            img_cropped = img.crop((left, top, right, bottom))
-
-            # result = model(img_cropped)
-            # df_results = result.pandas().xyxy[0]
-            # if len(df_results) > 0 and df_results.iloc[0]['confidence'] >= 0.5:
-            #     img = img_cropped
-            #     break
-            result = model.predict(img_cropped, conf=0.5, save=True, project='./runs/detect')[0]
-            boxes_array = result.boxes.numpy()
-            if len(boxes_array) > 0:
-                img = img_cropped
-                break
-
-        # img = np.asarray(img)
-        # w, h = img.shape[:2]
-        # M = w // 4
-        # N = h // 4
-        # tiles = [img[x:x+M,y:y+N] for x in range(0,w,M) for y in range(0,h,N)]
-
-        # tiles = tiles[4:-4] + tiles[:4] + tiles[-4:]
-
-        # for tile in tiles:
-        #     img = Image.fromarray(tile)
-        #     result = model(img)
-        #     df_results = result.pandas().xyxy[0]
-        #     if len(df_results) > 0 and df_results.iloc[0]['confidence'] >= 0.5:
-        #         break
-    # result.save('runs')
-    # df_results['bboxHt'] = df_results['ymax'] - df_results['ymin']
-    # df_results['bboxWt'] = df_results['xmax'] - df_results['xmin']
-
+    
+def _get_df_results(model, result) -> pd.DataFrame:
     names = model.names
     boxes_array = result.boxes.numpy()
     df_results = pd.DataFrame({'cls' : boxes_array.cls, 'confidence' : boxes_array.conf,\
                             'xmin' : boxes_array.xyxy[:, 0], 'ymin' : boxes_array.xyxy[:, 1],\
                             'xmax' : boxes_array.xyxy[:, 2], 'ymax' : boxes_array.xyxy[:, 3],\
-                            'bboxWt': boxes_array.xywh[:, 2], 'bboxHt': boxes_array.xywh[:, 3]})
+                            'bboxArea': boxes_array.xywh[:, 2] * boxes_array.xywh[:, 3]})
     df_results['name'] = df_results['cls'].map(names)
+    return df_results
 
-    # Label with largest bbox height will be last
-    df_results['bboxArea'] = df_results['bboxHt'] * df_results['bboxWt']
-    df_results.sort_values(by='bboxArea', ascending=False, inplace=True)
-    pred_list = df_results 
-    pred = 'NA'
-    # If prediction list is not empty
-    if pred_list.size != 0:
-        # Go through the predictions, and choose the first one with confidence > 0.5
-        for _, row in pred_list.iterrows():
-            if row['name'] != 'Bullseye':
-                pred = row    
-                break
+def _get_df_results_for_sahi_predictions(results: list[ObjectPrediction]) -> pd.DataFrame:
+    df_results = pd.DataFrame(columns=['name', 'confidence', 'xmin', 'ymin', 'xmax', 'ymax',\
+                                       'bboxArea'])
+    for r in results:
+        row = [r.category.name, r.score, r.bbox.minx, r.bbox.miny, r.bbox.maxx, r.bbox.maxy,\
+               r.bbox.area]
+        df_results.loc[len(df_results)] = row
+    return df_results
 
-        # Draw the bounding box on the image 
-        if not isinstance(pred,str):
-            draw_own_bbox(np.array(img), pred['xmin'], pred['ymin'], pred['xmax'], pred['ymax'], pred['name'])
+def _is_only_bullseye(df_results: pd.DataFrame) -> bool:
+    return df_results[df_results['name'] != 'Bullseye'].shape[0] == 0
+
+def predict_image_week_9(image, model: YOLO, predict_two=False):
+    CONF_THRESHOLD = 0.5
+    img_path = os.path.join('uploads', image)
+    # Load the image
+    img = Image.open(img_path)
+
+    result = model.predict(img, conf=CONF_THRESHOLD, save=True, project='./runs/detect')[0]
+    df_results = _get_df_results(model, result)
+    # Run inference
+    # result = model(img)
+    # df_results = result.pandas().xyxy[0]
+
+    # if len(df_results) == 0 or df_results.iloc[0]['confidence'] < 0.5:
+    if _is_only_bullseye(df_results):
+        detection_model = AutoDetectionModel.from_pretrained(
+            model_type='yolov8',
+            model=model,
+            confidence_threshold=CONF_THRESHOLD,
+        )
+        results = get_sliced_prediction(
+            img_path,
+            detection_model,
+            slice_height=640,
+            slice_width=640,
+            overlap_height_ratio=0.15,
+            overlap_width_ratio=0.15
+        )
         
+        df_results = _get_df_results_for_sahi_predictions(results.object_prediction_list)
+        now = datetime.now()
+        file_name = f"{image}_{now.hour}{now.minute}{now.second}"
+        results.export_visuals(export_dir='runs/detect/', file_name=file_name)
+
+    # result.save('runs')
+    # df_results['bboxHt'] = df_results['ymax'] - df_results['ymin']
+    # df_results['bboxWt'] = df_results['xmax'] - df_results['xmin']
+
+    df_results.sort_values(by='bboxArea', ascending=False, inplace=True)
+    pred_list: pd.DataFrame = df_results[df_results['name'] != 'Bullseye']
+
+    image_id_1 = 'NA'
+    image_id_2 = 'NA'
     # Dictionary is shorter as only two symbols, left and right are needed
     name_to_id = {
         "NA": 'NA',
@@ -333,13 +324,21 @@ def predict_image_week_9(image, model):
         "Right Arrow": 38,
         "Left Arrow": 39,
     }
-    # Return the image id
-    if not isinstance(pred,str):
-        image_id = str(name_to_id[pred['name']])
-    else:
-        image_id = 'NA'
-    return image_id
 
+    if df_results.shape[0] != 0:
+        pred = pred_list.iloc[0]
+        draw_own_bbox(np.array(img), pred['xmin'], pred['ymin'], pred['xmax'], pred['ymax'], pred['name'])
+        image_id_1 = str(name_to_id[pred['name']])
+
+    if not predict_two:
+        return image_id_1
+    else:
+        if df_results.shape[0] >= 2:
+            pred = pred_list.iloc[1]
+            draw_own_bbox(np.array(img), pred['xmin'], pred['ymin'], pred['xmax'], pred['ymax'], pred['name'])
+            image_id_2 = str(name_to_id[pred['name']])
+        return image_id_1, image_id_2
+        
 
 def stitch_image():
     """

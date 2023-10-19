@@ -41,6 +41,29 @@ def image_predict():
     }
     return jsonify(result)
 
+@app.route('/image-week9', methods=['POST'])
+def image_predict_week9():
+    """
+    This is the main endpoint for the image prediction algorithm
+    :return: a json object with a key "result" and value a dictionary with keys "obstacle_id" and "image_id"
+    """
+    file = request.files['file']
+    filename = file.filename
+    file.save(os.path.join('uploads', filename))
+    # filename format: "<timestamp>_<obstacle_id>_<signal>.jpeg"
+    constituents = file.filename.split("_")
+    obstacle_id = constituents[1]
+    
+    image_id_1, image_id_2 = predict_image_week_9(filename,model, predict_two=True)
+
+    # Return the obstacle_id and image_id
+    result = {
+        "obstacle_id": obstacle_id,
+        "image_id_1": image_id_1,
+        "image_id_2": image_id_2
+    }
+    return jsonify(result)
+
 @app.route('/stitch', methods=['GET'])
 def stitch():
     """
