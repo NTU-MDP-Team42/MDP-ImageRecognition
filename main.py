@@ -32,12 +32,16 @@ def image_predict():
 
     ## Week 9 ## 
     # We don't need to pass in the signal anymore
-    image_id = predict_image_week_9(filename,model)
+    # image_id = predict_image_week_9(filename,model)
+    image_id_1, image_id_2 = predict_image_week_9(filename,model, predict_two=True)
+
 
     # Return the obstacle_id and image_id
     result = {
         "obstacle_id": obstacle_id,
-        "image_id": image_id
+        # "image_id": image_id
+        "image_id_1": image_id_1,
+        "image_id_2": image_id_2
     }
     return jsonify(result)
 
