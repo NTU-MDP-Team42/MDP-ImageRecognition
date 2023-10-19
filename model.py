@@ -37,7 +37,7 @@ def load_model():
     """
     Load the model from the local directory
     """
-    model = YOLO("./pytorch-models/YOLOv8_revised_Week9_VER1.pt")
+    model = YOLO("./pytorch-models/YOLOv8_revised_Week9_VER2.pt")
     # model = torch.hub.load('./yolov5', 'custom', path="./pytorch-models/Week9_ver1.pt", source='local')
     return model
 
@@ -295,10 +295,10 @@ def predict_image_week_9(image, model: YOLO, predict_two=False):
         results = get_sliced_prediction(
             img_path,
             detection_model,
-            slice_height=640,
-            slice_width=640,
-            overlap_height_ratio=0.15,
-            overlap_width_ratio=0.15
+            slice_height=800,
+            slice_width=800,
+            overlap_height_ratio=0.2,
+            overlap_width_ratio=0.2
         )
         
         df_results = _get_df_results_for_sahi_predictions(results.object_prediction_list)
