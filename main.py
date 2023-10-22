@@ -28,13 +28,11 @@ def image_predict():
 
     ## Week 8 ## 
     # signal = constituents[2].strip(".jpg")
-    # image_id = predict_image(filename, model, signal)
+    image_id = predict_image(filename, model, 'C')
 
     ## Week 9 ## 
     # We don't need to pass in the signal anymore
     # image_id = predict_image_week_9(filename,model)
-    image_id_1, image_id_2 = predict_image_week_9(filename,model, predict_two=True)
-
 
     # Return the obstacle_id and image_id
     result = {
@@ -58,13 +56,35 @@ def image_predict_week9():
     constituents = file.filename.split("_")
     obstacle_id = constituents[1]
     
-    image_id_1, image_id_2 = predict_image_week_9(filename,model, predict_two=True)
+    image_id_1, image_id_2 = predict_image_week_9(filename, model, predict_two=True)
 
     # Return the obstacle_id and image_id
     result = {
         "obstacle_id": obstacle_id,
         "image_id_1": image_id_1,
         "image_id_2": image_id_2
+    }
+    return jsonify(result)
+
+@app.route('/image-week9-oneimg', methods=['POST'])
+def image_predict_week9_oneimg():
+    """
+    This is the main endpoint for the image prediction algorithm
+    :return: a json object with a key "result" and value a dictionary with keys "obstacle_id" and "image_id"
+    """
+    file = request.files['file']
+    filename = file.filename
+    file.save(os.path.join('uploads', filename))
+    # filename format: "<timestamp>_<obstacle_id>_<signal>.jpeg"
+    constituents = file.filename.split("_")
+    obstacle_id = constituents[1]
+    
+    image_id_1 = predict_image_week_9_oneimg(filename,model, predict_two=True)
+
+    # Return the obstacle_id and image_id
+    result = {
+        "obstacle_id": obstacle_id,
+        "image_id_1": image_id_1
     }
     return jsonify(result)
 

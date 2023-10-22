@@ -16,6 +16,7 @@ from sahi import AutoDetectionModel, ObjectPrediction
 from sahi.predict import get_prediction, get_sliced_prediction, predict
 from sahi.utils.cv import read_image
 from datetime import datetime
+import multiprocessing
 
 def get_random_string(length):
     """
@@ -273,19 +274,13 @@ def _get_df_results_for_sahi_predictions(results: list[ObjectPrediction]) -> pd.
 def _is_only_bullseye(df_results: pd.DataFrame) -> bool:
     return df_results[df_results['name'] != 'Bullseye'].shape[0] == 0
 
-def predict_image_week_9(image, model: YOLO, predict_two=False):
+def predict_image_worker(img, image, model: YOLO, predict_two=False, queue = None):
     CONF_THRESHOLD = 0.5
-    img_path = os.path.join('uploads', image)
-    # Load the image
-    img = Image.open(img_path)
-
-    result = model.predict(img, conf=CONF_THRESHOLD, save=True, project='./runs/detect')[0]
+    img_path = os.path.join('uploads', img)
+    result = model.predict(image, conf=CONF_THRESHOLD, save=True, project='./runs/detect')[0]
     df_results = _get_df_results(model, result)
-    # Run inference
-    # result = model(img)
-    # df_results = result.pandas().xyxy[0]
+    print(df_results)
 
-    # if len(df_results) == 0 or df_results.iloc[0]['confidence'] < 0.5:
     if _is_only_bullseye(df_results):
         detection_model = AutoDetectionModel.from_pretrained(
             model_type='yolov8',
@@ -306,15 +301,10 @@ def predict_image_week_9(image, model: YOLO, predict_two=False):
         file_name = f"{image}_{now.hour}{now.minute}{now.second}"
         results.export_visuals(export_dir='runs/detect/', file_name=file_name)
 
-    # result.save('runs')
-    # df_results['bboxHt'] = df_results['ymax'] - df_results['ymin']
-    # df_results['bboxWt'] = df_results['xmax'] - df_results['xmin']
-
     df_results.sort_values(by='bboxArea', ascending=False, inplace=True)
     pred_list: pd.DataFrame = df_results[df_results['name'] != 'Bullseye']
 
-    image_id_1 = 'NA'
-    image_id_2 = 'NA'
+    image_id = 'NA'
     # Dictionary is shorter as only two symbols, left and right are needed
     name_to_id = {
         "NA": 'NA',
@@ -325,20 +315,81 @@ def predict_image_week_9(image, model: YOLO, predict_two=False):
         "Left Arrow": 39,
     }
 
-    if df_results.shape[0] != 0:
-        pred = pred_list.iloc[0]
-        draw_own_bbox(np.array(img), pred['xmin'], pred['ymin'], pred['xmax'], pred['ymax'], pred['name'])
-        image_id_1 = str(name_to_id[pred['name']])
+    pred = pred_list.iloc[0]
+    draw_own_bbox(np.array(image), pred['xmin'], pred['ymin'], pred['xmax'], pred['ymax'], pred['name'])
+    image_id = str(name_to_id[pred['name']])
+    queue.put(image_id)
 
-    if not predict_two:
-        return image_id_1
-    else:
-        if df_results.shape[0] >= 2:
-            pred = pred_list.iloc[1]
-            draw_own_bbox(np.array(img), pred['xmin'], pred['ymin'], pred['xmax'], pred['ymax'], pred['name'])
-            image_id_2 = str(name_to_id[pred['name']])
-        return image_id_1, image_id_2
+def predict_image_week_9_oneimg(image, model: YOLO, predict_two=True):
+    CONF_THRESHOLD = 0.5
+    img_path = os.path.join('uploads', image)
+    image = Image.open(img_path)
+    result = model.predict(image, conf=CONF_THRESHOLD, save=True, project='./runs/detect')[0]
+    df_results = _get_df_results(model, result)
+
+    if _is_only_bullseye(df_results):
+        detection_model = AutoDetectionModel.from_pretrained(
+            model_type='yolov8',
+            model=model,
+            confidence_threshold=CONF_THRESHOLD,
+        )
+        results = get_sliced_prediction(
+            img_path,
+            detection_model,
+            slice_height=800,
+            slice_width=800,
+            overlap_height_ratio=0.2,
+            overlap_width_ratio=0.2
+        )
         
+        df_results = _get_df_results_for_sahi_predictions(results.object_prediction_list)
+        now = datetime.now()
+        file_name = f"{image}_{now.hour}{now.minute}{now.second}"
+        results.export_visuals(export_dir='runs/detect/', file_name=file_name)
+
+    df_results.sort_values(by='bboxArea', ascending=False, inplace=True)
+    pred_list: pd.DataFrame = df_results[df_results['name'] != 'Bullseye']
+
+    image_id = 'NA'
+    # Dictionary is shorter as only two symbols, left and right are needed
+    name_to_id = {
+        "NA": 'NA',
+        "Bullseye": 10,
+        "Right": 38,
+        "Left": 39,
+        "Right Arrow": 38,
+        "Left Arrow": 39,
+    }
+
+    pred = pred_list.iloc[0]
+    print(pred)
+    draw_own_bbox(np.array(image), pred['xmin'], pred['ymin'], pred['xmax'], pred['ymax'], pred['name'])
+    image_id = str(name_to_id[pred['name']])
+    
+    return image_id
+    
+def predict_image_week_9(image, model: YOLO, predict_two=True):
+    queue1 = multiprocessing.Queue()
+    queue2 = multiprocessing.Queue()
+
+    img_path = os.path.join('uploads', image)
+    # Load the image
+    first_img = crop_below(img_path)
+    second_img = crop_center(img_path)
+
+    p1 = multiprocessing.Process(target = predict_image_worker, args = (image, first_img, model, predict_two, queue1))
+    p2 = multiprocessing.Process(target = predict_image_worker, args = (image, second_img, model, predict_two, queue2))
+
+    p1.start()
+    p2.start()
+
+    p1.join()
+    p2.join()
+
+    result1 =queue1.get()
+    result2 = queue2.get()
+    print(result1,result2)
+    return result1, result2
 
 def stitch_image():
     """
@@ -402,3 +453,35 @@ def stitch_image_own():
 
     return stitchedImg
 
+
+def crop_below(image_path):
+    # Open an image file
+    with Image.open(image_path) as img:
+        width, height = img.size
+        # Determine the size of the crop
+        new_width = width // 3
+        new_height = height // 2
+        # Calculate the left, top, right, bottom coordinates for cropping
+        left = (width - new_width) // 2
+        top = height * 2 // 3
+        right = (width + new_width) // 2
+        bottom = height
+        # Crop the specified regions of the image
+        img_cropped = img.crop((left, top, right, bottom))
+        return img_cropped
+
+def crop_center(image_path):
+    # Open an image file
+    with Image.open(image_path) as img:
+        width, height = img.size
+        # Determine the size of the crop
+        new_width = width // 3
+        new_height = height // 2
+        # Calculate the left, top, right, bottom coordinates for cropping
+        left = (width - new_width) // 2
+        top = height //3
+        right = (width + new_width) // 2
+        bottom = height * 2 // 3
+        # Crop the specified regions of the image
+        img_cropped = img.crop((left, top, right, bottom))
+        return img_cropped
